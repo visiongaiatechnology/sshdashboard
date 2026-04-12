@@ -1,137 +1,198 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # VISIONGAIATECHNOLOGY R&D STUFF - TERMINAL DASHBOARD V2 (APEX)
-# STATUS: EXPERIMENTAL
+# STATUS: VGT SUPREME (PLATINUM ARCHITECTURE)
 # TARGET: Ubuntu / Debian / aaPanel Enterprise Environment
-# EXECUTION: Zero-Latency / Deep Kernel & Log Extraction
+# EXECUTION: Zero-Latency / Deep Kernel & Log Extraction / Hardened
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# 1. COLOR & UI DEFINITIONS (ANSI 256)
-# ------------------------------------------------------------------------------
-c_reset="\033[0m"
-c_bold="\033[1m"
-c_dim="\033[2m"
-
-c_label="\033[38;5;242m"    # Dark Gray
-c_val="\033[38;5;253m"      # Light Gray/White
-c_head="\033[38;5;39m"      # VGT Cyan/Blue
-c_green="\033[38;5;113m"    # Status OK
-c_red="\033[38;5;196m"      # Status Crit
-c_yellow="\033[38;5;220m"   # Status Warn/Updates
-c_magenta="\033[38;5;170m"  # IPs / Highlights
-c_bar_bg="\033[38;5;236m"   # Bar Background
-c_line="\033[38;5;239m"     # Divider Lines
+# --- KERNEL DIRECTIVES & HARDENING ---
+set -euo pipefail
+export LANG=C
+export LC_ALL=C
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # ------------------------------------------------------------------------------
-# 2. CORE SYSTEM METRICS EXTRACTION
+# 1. COLOR & UI DEFINITIONS (ANSI 256) - READONLY
 # ------------------------------------------------------------------------------
-HOSTNAME=$(hostname -f)
-USER_NAME=$(whoami)
-PRIVILEGE=$([ "$EUID" -eq 0 ] && echo -e "${c_red}sudo${c_reset}" || echo -e "${c_val}user${c_reset}")
+readonly c_reset="\033[0m"
+readonly c_bold="\033[1m"
+readonly c_dim="\033[2m"
 
-# Sessions parsing
-SESSIONS_RAW=$(who)
-SESSIONS_COUNT=$(echo "$SESSIONS_RAW" | wc -l)
-SESSIONS_LIST=$(echo "$SESSIONS_RAW" | awk '{print $1}' | sort | uniq -c | awk '{print $2"("$1")"}' | paste -sd ", " -)
-
-# OS & Kernel
-OS_PRETTY=$(grep -P '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
-KERNEL=$(uname -r)
-VIRT=$(systemd-detect-virt 2>/dev/null || echo "Bare Metal / Unknown")
-
-# Uptime
-UPTIME_SEC=$(awk '{print $1}' /proc/uptime | cut -d. -f1)
-UP_D=$((UPTIME_SEC / 86400)); UP_H=$((UPTIME_SEC % 86400 / 3600)); UP_M=$((UPTIME_SEC % 3600 / 60))
-UPTIME_STR="${UP_D} days, ${UP_H} hours, ${UP_M} minutes"
-
-# Load & CPU
-LOAD_AVG=$(cat /proc/loadavg | awk '{print $1", "$2", "$3}')
-CPU_CORES=$(nproc)
-
-# Network
-# VGT UPDATE: Extrahiert nur die primäre IP des default-Routings (ignoriert Docker/Virtual Bridges)
-IP_LOCAL=$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+')
-IP_PUBLIC=$(curl -s -m 0.5 https://ifconfig.me/ip 2>/dev/null || echo "Offline")
-
-# Memory & Disk
-read -r RAM_TOTAL RAM_USED RAM_FREE RAM_PERCENT <<< $(free -m | awk 'NR==2{printf "%s %s %s %.0f", $2, $3, $7, $3*100/$2}')
-RAM_TOTAL_GB=$(awk "BEGIN {printf \"%.1f\", $RAM_TOTAL/1024}")
-RAM_USED_GB=$(awk "BEGIN {printf \"%.1f\", $RAM_USED/1024}")
-RAM_FREE_GB=$(awk "BEGIN {printf \"%.1f\", $RAM_FREE/1024}")
-read -r DISK_SIZE DISK_USED DISK_FREE DISK_PERCENT <<< $(df -h / | awk 'NR==2{print $2, $3, $4, $5}' | sed 's/%//')
+readonly c_label="\033[38;5;242m"    # Dark Gray
+readonly c_val="\033[38;5;253m"      # Light Gray/White
+readonly c_head="\033[38;5;39m"      # VGT Cyan/Blue
+readonly c_green="\033[38;5;113m"    # Status OK
+readonly c_red="\033[38;5;196m"      # Status Crit
+readonly c_yellow="\033[38;5;220m"   # Status Warn/Updates
+readonly c_magenta="\033[38;5;170m"  # IPs / Highlights
+readonly c_bar_bg="\033[38;5;236m"   # Bar Background
+readonly c_line="\033[38;5;239m"     # Divider Lines
 
 # ------------------------------------------------------------------------------
-# 3. SECURITY & UPDATES ENGINE
+# 2. SECURITY SANITIZATION ENGINE
 # ------------------------------------------------------------------------------
-# Updates Check (Reads Ubuntu cache to prevent latency)
-UPDATES_STR="Up to date"
-if [ -f /var/lib/update-notifier/updates-available ]; then
-    SEC_UPDATES=$(awk '/security updates/ {print $1}' /var/lib/update-notifier/updates-available 2>/dev/null)
-    ALL_UPDATES=$(awk '/packages can be updated/ {print $1}' /var/lib/update-notifier/updates-available 2>/dev/null)
-    if [ -n "$ALL_UPDATES" ] && [ "$ALL_UPDATES" -gt 0 ]; then
-        UPDATES_STR="${ALL_UPDATES} package(s) available (${SEC_UPDATES:-0} security)"
-    fi
-fi
-
-# Reboot Check
-REBOOT_REQ=""
-[ -f /var/run/reboot-required ] && REBOOT_REQ="${c_yellow}⚠ System reboot required (kernel ${KERNEL} pending)${c_reset}"
-
-# Services Status (Expanded for Enterprise)
-check_service() {
-    if systemctl is-active --quiet "$1" 2>/dev/null || /etc/init.d/"$1" status 2>/dev/null | grep -q "running"; then
-        echo -e "${c_green}●${c_reset} ${c_val}$2${c_reset}"
+# Verhindert Terminal Escape Sequence Injection (CWE-150)
+sanitize_ip() {
+    local input="$1"
+    if [[ "$input" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "$input" =~ ^[a-fA-F0-9:]+$ ]]; then
+        echo "$input"
     else
-        echo -e "${c_red}●${c_reset} ${c_dim}$2${c_reset}"
+        echo "Invalid/Offline"
     fi
 }
 
-SVC_FAIL2BAN=$(check_service "fail2ban" "fail2ban")
-SVC_NGINX=$(check_service "nginx" "Nginx")
-SVC_BT=$(check_service "bt" "aaPanel")
-SVC_MYSQL=$(check_service "mysqld" "MySQL")
+sanitize_str() {
+    # Erlaubt nur Alphanumerisch, Punkte, Striche, Unterstriche, Doppelpunkte und Spaces
+    echo "$1" | tr -dc '[:alnum:] ._:-' | cut -c 1-50
+}
 
-# Fail2ban Metrics Extraction (Requires root/sudo for log access)
-F2B_STATS="${c_dim}no data (requires root)${c_reset}"
-if [ -r /var/log/fail2ban.log ]; then
-    BANNED_COUNT=$(grep "Ban " /var/log/fail2ban.log | wc -l)
-    F2B_STATS="${c_yellow}${BANNED_COUNT} IP(s) banned${c_reset} (extracted from logs)"
+# ------------------------------------------------------------------------------
+# 3. CORE SYSTEM METRICS EXTRACTION (ZERO-LATENCY)
+# ------------------------------------------------------------------------------
+readonly HOSTNAME=$(hostname -f 2>/dev/null || echo "unknown")
+readonly USER_NAME=$(whoami)
+readonly EUID_VAL=$(id -u)
+
+if [ "$EUID_VAL" -eq 0 ]; then
+    PRIVILEGE="${c_red}sudo${c_reset}"
+else
+    PRIVILEGE="${c_val}user${c_reset}"
+fi
+
+# Native Read (No Subshells) für Load & Uptime
+read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
+read -r UPTIME_SEC_RAW _ < /proc/uptime
+UPTIME_SEC=${UPTIME_SEC_RAW%.*}
+UP_D=$((UPTIME_SEC / 86400))
+UP_H=$((UPTIME_SEC % 86400 / 3600))
+UP_M=$((UPTIME_SEC % 3600 / 60))
+readonly UPTIME_STR="${UP_D} days, ${UP_H} hours, ${UP_M} minutes"
+readonly CPU_CORES=$(nproc 2>/dev/null || echo 1)
+
+# OS & Kernel (Optimized Read)
+if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    OS_PRETTY="${PRETTY_NAME:-Linux}"
+else
+    OS_PRETTY="Unknown Linux"
+fi
+readonly KERNEL=$(uname -r)
+VIRT=$(systemd-detect-virt 2>/dev/null || echo "Bare Metal")
+readonly VIRT_SAN=$(sanitize_str "$VIRT")
+
+# Memory & Disk (POSIX Konformität -P verhindert Umbrüche)
+read -r _ RAM_TOTAL RAM_USED RAM_FREE _ _ < <(free -m | awk 'NR==2')
+RAM_PERCENT=$(( RAM_USED * 100 / RAM_TOTAL ))
+RAM_TOTAL_GB=$(awk "BEGIN {printf \"%.1f\", $RAM_TOTAL/1024}")
+RAM_USED_GB=$(awk "BEGIN {printf \"%.1f\", $RAM_USED/1024}")
+RAM_FREE_GB=$(awk "BEGIN {printf \"%.1f\", $RAM_FREE/1024}")
+
+read -r _ DISK_SIZE DISK_USED DISK_FREE DISK_PERCENT_RAW _ < <(df -hP / | awk 'NR==2')
+DISK_PERCENT=${DISK_PERCENT_RAW%\%}
+
+# Network (Timeouts enforced at DNS level via curl parameters)
+IP_LOCAL_RAW=$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1")
+readonly IP_LOCAL=$(sanitize_ip "$IP_LOCAL_RAW")
+IP_PUBLIC_RAW=$(curl -s --connect-timeout 0.5 --max-time 0.5 https://ifconfig.me/ip 2>/dev/null || echo "Offline")
+readonly IP_PUBLIC=$(sanitize_ip "$IP_PUBLIC_RAW")
+
+# Sessions (Sanitized)
+SESSIONS_RAW=$(who 2>/dev/null || true)
+if [ -n "$SESSIONS_RAW" ]; then
+    SESSIONS_COUNT=$(echo "$SESSIONS_RAW" | wc -l)
+    SESSIONS_LIST=$(echo "$SESSIONS_RAW" | awk '{print $1}' | tr -dc '[:alnum:]\n' | sort | uniq -c | awk '{print $2"("$1")"}' | paste -sd ", " -)
+else
+    SESSIONS_COUNT=0
+    SESSIONS_LIST="none"
 fi
 
 # ------------------------------------------------------------------------------
-# 4. RENDER ENGINE (UI BUILDER)
+# 4. SECURITY & UPDATES ENGINE
+# ------------------------------------------------------------------------------
+UPDATES_STR="Up to date"
+if [ -f /var/lib/update-notifier/updates-available ]; then
+    SEC_UPDATES=$(grep -Eo '[0-9]+ security' /var/lib/update-notifier/updates-available | awk '{print $1}' || echo 0)
+    ALL_UPDATES=$(grep -Eo '[0-9]+ packages' /var/lib/update-notifier/updates-available | awk '{print $1}' || echo 0)
+    if [ "$ALL_UPDATES" -gt 0 ]; then
+        UPDATES_STR="${ALL_UPDATES} package(s) available (${SEC_UPDATES} security)"
+    fi
+fi
+
+REBOOT_REQ=""
+[ -f /var/run/reboot-required ] && REBOOT_REQ="${c_yellow}⚠ System reboot required (kernel ${KERNEL} pending)${c_reset}"
+
+check_service() {
+    local svc="$1"
+    local name="$2"
+    if systemctl is-active --quiet "$svc" 2>/dev/null || ( [ -x "/etc/init.d/$svc" ] && "/etc/init.d/$svc" status 2>/dev/null | grep -q "running" ); then
+        echo -e "${c_green}●${c_reset} ${c_val}${name}${c_reset}"
+    else
+        echo -e "${c_red}●${c_reset} ${c_dim}${name}${c_reset}"
+    fi
+}
+
+readonly SVC_FAIL2BAN=$(check_service "fail2ban" "fail2ban")
+readonly SVC_NGINX=$(check_service "nginx" "Nginx")
+readonly SVC_BT=$(check_service "bt" "aaPanel")
+readonly SVC_MYSQL=$(check_service "mysqld" "MySQL")
+
+# Fail2ban Metrics Extraction (Bounded I/O)
+F2B_STATS="${c_dim}no data (requires root or adm group)${c_reset}"
+if [ -r /var/log/fail2ban.log ]; then
+    # O(1) Limitierung: Liest maximal die letzten 10000 Zeilen um IO Stalls zu verhindern
+    BANNED_COUNT=$(tail -n 10000 /var/log/fail2ban.log | grep -c "Ban " || echo 0)
+    if [ "$BANNED_COUNT" -eq 10000 ]; then
+        F2B_STATS="${c_yellow}>10000 IP(s) banned${c_reset} (extracted from recent logs)"
+    else
+        F2B_STATS="${c_yellow}${BANNED_COUNT} IP(s) banned${c_reset} (extracted from recent logs)"
+    fi
+fi
+
+# ------------------------------------------------------------------------------
+# 5. RENDER ENGINE (UI BUILDER)
 # ------------------------------------------------------------------------------
 draw_bar() {
     local percent=$1
     local bar_len=40
+    
+    # Sicherstellen, dass percent numerisch ist
+    [[ "$percent" =~ ^[0-9]+$ ]] || percent=0
+    [ "$percent" -gt 100 ] && percent=100
+
     local filled=$((percent * bar_len / 100))
     local empty=$((bar_len - filled))
     local bar_color=$c_green
+    
     [ "$percent" -gt 70 ] && bar_color=$c_yellow
     [ "$percent" -gt 85 ] && bar_color=$c_red
 
-    local b_filled=$(printf "%${filled}s" | tr ' ' '█')
-    local b_empty=$(printf "%${empty}s" | tr ' ' '░')
+    local b_filled=""
+    local b_empty=""
+    [ $filled -gt 0 ] && b_filled=$(printf "%${filled}s" | tr ' ' '█')
+    [ $empty -gt 0 ] && b_empty=$(printf "%${empty}s" | tr ' ' '░')
+    
     echo -e "${bar_color}${b_filled}${c_bar_bg}${b_empty}${c_reset}"
 }
 
 print_row() { printf "  ${c_label}%-15s${c_reset} %b\n" "$1:" "$2"; }
 
 draw_section() {
-    local title=$1
+    local title="$1"
     local line_len=$(( 55 - ${#title} ))
+    [ $line_len -lt 1 ] && line_len=1
     local line_str=$(printf '─%.0s' $(seq 1 $line_len))
     echo -e "  ${c_line}── ${c_head}${title} ${c_line}${line_str}${c_reset}"
 }
 
 # ------------------------------------------------------------------------------
-# 5. FINAL UI RENDER
+# 6. FINAL UI RENDER
 # ------------------------------------------------------------------------------
 clear
 echo ""
 echo -e "      ${c_line}┌────────────────────────────────────────────────────────┐${c_reset}"
-echo -e "      ${c_line}│${c_reset}  ${c_head}${c_bold}YOURNAME${c_reset} ${c_dim}• YOUR ENGINE${c_reset}               ${c_line}│${c_reset}"
+echo -e "      ${c_line}│${c_reset}  ${c_head}${c_bold}VISIONGAIATECHNOLOGY${c_reset} ${c_dim}• ENGINE HUD${c_reset}           ${c_line}│${c_reset}"
 echo -e "      ${c_line}└────────────────────────────────────────────────────────┘${c_reset}"
 echo ""
 
@@ -139,19 +200,19 @@ print_row "Logged as" "${c_val}${USER_NAME}@${HOSTNAME}${c_reset}"
 print_row "Privileges" "${PRIVILEGE}"
 print_row "Sessions" "${c_val}${SESSIONS_COUNT} active (${SESSIONS_LIST})${c_reset}"
 echo ""
-print_row "OS" "${c_val}${OS_PRETTY}${c_reset}"
-print_row "Type" "${c_val}${VIRT}${c_reset}"
+print_row "OS" "${c_val}$(sanitize_str "${OS_PRETTY}")${c_reset}"
+print_row "Type" "${c_val}${VIRT_SAN}${c_reset}"
 print_row "Kernel" "${c_dim}${KERNEL}${c_reset}"
 print_row "IP addresses" "${c_magenta}${IP_LOCAL}${c_reset}"
 print_row "Public IP" "${c_red}${IP_PUBLIC}${c_reset}"
 print_row "Uptime" "${c_val}up ${UPTIME_STR}${c_reset}"
-print_row "Load average" "${c_val}${LOAD_AVG} (${CPU_CORES} cores)${c_reset}"
+print_row "Load average" "${c_val}${LOAD1}, ${LOAD5}, ${LOAD15} (${CPU_CORES} cores)${c_reset}"
 echo ""
 printf "  ${c_label}%-15s${c_reset} RAM - %s used, %s available %9s / %s\n" "Memory:" "${RAM_USED_GB}G" "${RAM_FREE_GB}G" "" "${RAM_TOTAL_GB}G"
-printf "  %-15s %b\n" "" "$(draw_bar $RAM_PERCENT)"
+printf "  %-15s %b\n" "" "$(draw_bar "$RAM_PERCENT")"
 echo ""
 printf "  ${c_label}%-15s${c_reset} %s used, %s free %16s / %s\n" "Disk (/):" "${DISK_USED}" "${DISK_FREE}" "" "${DISK_SIZE}"
-printf "  %-15s %b\n" "" "$(draw_bar $DISK_PERCENT)"
+printf "  %-15s %b\n" "" "$(draw_bar "$DISK_PERCENT")"
 echo ""
 printf "  ${c_label}%-15s${c_reset} %b   %b   %b   %b\n" "Services:" "$SVC_FAIL2BAN" "$SVC_BT" "$SVC_NGINX" "$SVC_MYSQL"
 print_row "Updates" "${c_val}${UPDATES_STR}${c_reset}"
@@ -164,35 +225,40 @@ printf "    ${c_label}%-13s${c_reset} %b\n" "fail2ban:" "${F2B_STATS}"
 printf "    ${c_label}%-13s${c_reset} %b\n" "aaPanel:" "${c_val}running (master node)${c_reset}"
 echo ""
 
-# --- BANNED IPS SECTION ---
-draw_section "Banned IPs (last 24h)"
+# --- BANNED IPS SECTION (SANITIZED) ---
+draw_section "Banned IPs (recent)"
 if [ -r /var/log/fail2ban.log ]; then
-    # Extracts last 4 bans efficiently
-    grep "Ban " /var/log/fail2ban.log | tail -n 4 | while read -r date time _ jail ip _; do
-        # Format: IP, Jail, Time
-        printf "    ${c_red}%-16s${c_reset} ${c_label}%-12s${c_reset} ${c_dim}%s %s${c_reset}\n" "$ip" "$jail" "$date" "${time%,*}"
+    # Bounded read to prevent memory/CPU spikes. Sanitized output.
+    tail -n 1000 /var/log/fail2ban.log | grep "Ban " | tail -n 4 | while read -r date time _ jail ip _; do
+        s_ip=$(sanitize_ip "$ip")
+        s_jail=$(sanitize_str "$jail")
+        printf "    ${c_red}%-16s${c_reset} ${c_label}%-12s${c_reset} ${c_dim}%s %s${c_reset}\n" "$s_ip" "$s_jail" "$date" "${time%,*}"
     done
 else
     echo -e "    ${c_dim}Log unreadable. Execute as root or add user to adm group.${c_reset}"
 fi
 echo ""
 
-# --- RECENT LOGINS SECTION ---
+# --- RECENT LOGINS SECTION (SANITIZED) ---
 draw_section "Recent Logins"
-last -a | head -n 4 | while read -r line; do
+last -a 2>/dev/null | head -n 4 | while read -r line; do
     if [[ -n "$line" && ! "$line" == wtmp* ]]; then
         user=$(echo "$line" | awk '{print $1}')
         tty=$(echo "$line" | awk '{print $2}')
         ip=$(echo "$line" | awk '{print $NF}')
         time_data=$(echo "$line" | awk '{print $3, $4, $5, $6, $7, $8}')
         
-        # Check if still logged in
+        s_user=$(sanitize_str "$user")
+        s_tty=$(sanitize_str "$tty")
+        s_ip=$(sanitize_ip "$ip")
+        s_time=$(sanitize_str "$time_data")
+
         status_color=$c_label
-        [[ "$time_data" == *"still logged in"* ]] && status_color=$c_green
+        [[ "$s_time" == *"still logged in"* ]] && status_color=$c_green
         
-        printf "    ${c_val}%-15s${c_reset} ${c_dim}%-8s${c_reset} ${c_magenta}%-16s${c_reset} ${status_color}%s${c_reset}\n" "$user" "$tty" "$ip" "$time_data"
+        printf "    ${c_val}%-15s${c_reset} ${c_dim}%-8s${c_reset} ${c_magenta}%-16s${c_reset} ${status_color}%s${c_reset}\n" "$s_user" "$s_tty" "$s_ip" "$s_time"
     fi
 done
 echo ""
-echo -e "  ${c_dim}Managed by YOURNAME. All activity is strictly monitored.${c_reset}"
+echo -e "  ${c_dim}Managed by VISIONGAIATECHNOLOGY. All activity is strictly monitored.${c_reset}"
 echo ""
