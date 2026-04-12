@@ -199,9 +199,10 @@ draw_bar() {
 
     local b_filled=""
     local b_empty=""
-    # VGT HUD Style: Solid blocks for fill, subtle dots for empty space
-    [ $filled -gt 0 ] && b_filled=$(printf "%${filled}s" | tr ' ' '█')
-    [ $empty -gt 0 ] && b_empty=$(printf "%${empty}s" | tr ' ' '·')
+    
+    # VGT FIX: Native Bash Loop statt `tr`, um UTF-8 Multi-Byte Corruption (▒▒▒▒) zu verhindern
+    [ $filled -gt 0 ] && for ((i=0; i<filled; i++)); do b_filled="${b_filled}█"; done
+    [ $empty -gt 0 ] && for ((i=0; i<empty; i++)); do b_empty="${b_empty}·"; done
     
     echo -e "${bar_color}${b_filled}${c_bar_bg}${b_empty}${c_reset}"
 }
@@ -259,7 +260,8 @@ draw_section "Security Core" "$g_sec"
 printf "    ${c_label}%-13s${c_reset} %b\n" "fail2ban:" "${F2B_STATS}"
 
 if [ -n "$CP_NAME" ]; then
-    if systemctl is-active --quiet "$CP_SVC" 2>/dev/null || ( [ -x "/etc/init.d/$CP_SVC" ] && "/etc/init.d/$CP_SVC" status 2>/dev/null | grep -q "running" ); then
+    # VGT FIX: grep -q durch grep >/dev/null ersetzt, um den SIGPIPE false-negative zu verhindern
+    if systemctl is-active --quiet "$CP_SVC" 2>/dev/null || ( [ -x "/etc/init.d/$CP_SVC" ] && "/etc/init.d/$CP_SVC" status 2>/dev/null | grep "running" >/dev/null ); then
         cp_status="${c_val}running (active node)${c_reset}"
     else
         cp_status="${c_dim}inactive/stopped${c_reset}"
@@ -273,10 +275,11 @@ echo ""
 # --- BANNED IPS SECTION (SANITIZED) ---
 draw_section "Recent Threat Bans" "$g_sec"
 if [ -r /var/log/fail2ban.log ]; then
-    tail -n 1000 /var/log/fail2ban.log | grep "Ban " | tail -n 4 | while read -r date time _ jail ip _; do
+    # VGT FIX: Robuster Regex-Parser via sed, um Column-Shifts durch Log-PIDs zu ignorieren
+    tail -n 1000 /var/log/fail2ban.log | grep "Ban " | tail -n 4 | sed -nE 's/^([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}).*\[([a-zA-Z0-9_-]+)\] Ban ([0-9a-fA-F:\.]+).*$/\1 \2 \3 \4/p' | while read -r date time jail ip; do
         s_ip=$(sanitize_ip "$ip")
         s_jail=$(sanitize_str "$jail")
-        printf "    ${c_dim}${g_arr}${c_reset} ${c_red}%-16s${c_reset} ${c_label}%-12s${c_reset} ${c_dim}%s %s${c_reset}\n" "$s_ip" "$s_jail" "$date" "${time%,*}"
+        printf "    ${c_dim}${g_arr}${c_reset} ${c_red}%-16s${c_reset} ${c_label}%-12s${c_reset} ${c_dim}%s %s${c_reset}\n" "$s_ip" "$s_jail" "$date" "$time"
     done
 else
     echo -e "    ${c_dim}Log unreadable. Execute as root or add user to adm group.${c_reset}"
