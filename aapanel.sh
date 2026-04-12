@@ -26,8 +26,15 @@ readonly c_green="\033[38;5;113m"    # Status OK
 readonly c_red="\033[38;5;196m"      # Status Crit
 readonly c_yellow="\033[38;5;220m"   # Status Warn/Updates
 readonly c_magenta="\033[38;5;170m"  # IPs / Highlights
-readonly c_bar_bg="\033[38;5;236m"   # Bar Background
-readonly c_line="\033[38;5;239m"     # Divider Lines
+readonly c_bar_bg="\033[38;5;238m"   # Bar Background (Slightly lighter for contrast)
+readonly c_line="\033[38;5;237m"     # Divider Lines
+
+# VGT Semantic Glyphs (Fallback safe)
+readonly g_sys="⚙"
+readonly g_net="⟁"
+readonly g_sec="🛡"
+readonly g_usr="👤"
+readonly g_arr="›"
 
 # ------------------------------------------------------------------------------
 # 2. SECURITY SANITIZATION ENGINE
@@ -127,16 +134,37 @@ check_service() {
     local svc="$1"
     local name="$2"
     if systemctl is-active --quiet "$svc" 2>/dev/null || ( [ -x "/etc/init.d/$svc" ] && "/etc/init.d/$svc" status 2>/dev/null | grep -q "running" ); then
-        echo -e "${c_green}●${c_reset} ${c_val}${name}${c_reset}"
+        echo -e "${c_dim}[${c_green}●${c_dim}]${c_reset} ${c_val}${name}${c_reset}"
     else
-        echo -e "${c_red}●${c_reset} ${c_dim}${name}${c_reset}"
+        echo -e "${c_dim}[${c_red}●${c_dim}]${c_reset} ${c_dim}${name}${c_reset}"
     fi
 }
 
 readonly SVC_FAIL2BAN=$(check_service "fail2ban" "fail2ban")
 readonly SVC_NGINX=$(check_service "nginx" "Nginx")
-readonly SVC_BT=$(check_service "bt" "aaPanel")
 readonly SVC_MYSQL=$(check_service "mysqld" "MySQL")
+
+# Control Panel Zero-Latency Auto-Detection
+CP_NAME=""
+CP_SVC=""
+if [ -d "/www/server/panel" ] || systemctl is-active --quiet bt 2>/dev/null; then
+    CP_NAME="aaPanel"
+    CP_SVC="bt"
+elif [ -d "/usr/local/psa" ] || systemctl is-active --quiet psa 2>/dev/null || systemctl is-active --quiet sw-cp-server 2>/dev/null; then
+    CP_NAME="Plesk"
+    CP_SVC="psa"
+    systemctl is-active --quiet sw-cp-server 2>/dev/null && CP_SVC="sw-cp-server"
+elif [ -d "/usr/local/cpanel" ] || systemctl is-active --quiet cpanel 2>/dev/null; then
+    CP_NAME="cPanel"
+    CP_SVC="cpanel"
+fi
+
+if [ -n "$CP_NAME" ]; then
+    readonly SVC_CP=$(check_service "$CP_SVC" "$CP_NAME")
+else
+    # Fallback Design für Standalone Server
+    readonly SVC_CP=$(echo -e "${c_dim}[${c_dim}○${c_dim}]${c_reset} ${c_dim}No Panel${c_reset}")
+fi
 
 # Fail2ban Metrics Extraction (Bounded I/O)
 F2B_STATS="${c_dim}no data (requires root or adm group)${c_reset}"
@@ -155,7 +183,7 @@ fi
 # ------------------------------------------------------------------------------
 draw_bar() {
     local percent=$1
-    local bar_len=40
+    local bar_len=38
     
     # Sicherstellen, dass percent numerisch ist
     [[ "$percent" =~ ^[0-9]+$ ]] || percent=0
@@ -170,20 +198,27 @@ draw_bar() {
 
     local b_filled=""
     local b_empty=""
+    # VGT HUD Style: Solid blocks for fill, subtle dots for empty space
     [ $filled -gt 0 ] && b_filled=$(printf "%${filled}s" | tr ' ' '█')
-    [ $empty -gt 0 ] && b_empty=$(printf "%${empty}s" | tr ' ' '░')
+    [ $empty -gt 0 ] && b_empty=$(printf "%${empty}s" | tr ' ' '·')
     
     echo -e "${bar_color}${b_filled}${c_bar_bg}${b_empty}${c_reset}"
 }
 
-print_row() { printf "  ${c_label}%-15s${c_reset} %b\n" "$1:" "$2"; }
+print_row() { 
+    local glyph="$1"
+    local label="$2"
+    local val="$3"
+    printf "  ${c_head}%s${c_reset} ${c_label}%-14s${c_reset} %b\n" "$glyph" "$label:" "$val" 
+}
 
 draw_section() {
     local title="$1"
-    local line_len=$(( 55 - ${#title} ))
+    local glyph="$2"
+    local line_len=$(( 52 - ${#title} ))
     [ $line_len -lt 1 ] && line_len=1
     local line_str=$(printf '─%.0s' $(seq 1 $line_len))
-    echo -e "  ${c_line}── ${c_head}${title} ${c_line}${line_str}${c_reset}"
+    echo -e "  ${c_line}── ${c_head}${glyph} ${title} ${c_line}${line_str}${c_reset}"
 }
 
 # ------------------------------------------------------------------------------
@@ -191,48 +226,56 @@ draw_section() {
 # ------------------------------------------------------------------------------
 clear
 echo ""
-echo -e "      ${c_line}┌────────────────────────────────────────────────────────┐${c_reset}"
-echo -e "      ${c_line}│${c_reset}  ${c_head}${c_bold}VISIONGAIATECHNOLOGY${c_reset} ${c_dim}• ENGINE HUD${c_reset}           ${c_line}│${c_reset}"
-echo -e "      ${c_line}└────────────────────────────────────────────────────────┘${c_reset}"
+echo -e "      ${c_line}╭────────────────────────────────────────────────────────╮${c_reset}"
+echo -e "      ${c_line}│${c_reset}  ${c_head}${c_bold}VISIONGAIATECHNOLOGY${c_reset} ${c_dim}• APEX ENGINE HUD${c_reset}      ${c_line}│${c_reset}"
+echo -e "      ${c_line}╰────────────────────────────────────────────────────────╯${c_reset}"
 echo ""
 
-print_row "Logged as" "${c_val}${USER_NAME}@${HOSTNAME}${c_reset}"
-print_row "Privileges" "${PRIVILEGE}"
-print_row "Sessions" "${c_val}${SESSIONS_COUNT} active (${SESSIONS_LIST})${c_reset}"
+print_row "$g_usr" "Logged as" "${c_val}${USER_NAME}@${HOSTNAME}${c_reset}  ${c_dim}[${PRIVILEGE}${c_dim}]${c_reset}"
+print_row " " "Sessions" "${c_val}${SESSIONS_COUNT} active${c_reset} ${c_dim}(${SESSIONS_LIST})${c_reset}"
 echo ""
-print_row "OS" "${c_val}$(sanitize_str "${OS_PRETTY}")${c_reset}"
-print_row "Type" "${c_val}${VIRT_SAN}${c_reset}"
-print_row "Kernel" "${c_dim}${KERNEL}${c_reset}"
-print_row "IP addresses" "${c_magenta}${IP_LOCAL}${c_reset}"
-print_row "Public IP" "${c_red}${IP_PUBLIC}${c_reset}"
-print_row "Uptime" "${c_val}up ${UPTIME_STR}${c_reset}"
-print_row "Load average" "${c_val}${LOAD1}, ${LOAD5}, ${LOAD15} (${CPU_CORES} cores)${c_reset}"
+print_row "$g_sys" "OS" "${c_val}$(sanitize_str "${OS_PRETTY}")${c_reset} ${c_dim}(${VIRT_SAN})${c_reset}"
+print_row " " "Kernel" "${c_dim}${KERNEL}${c_reset}"
+print_row " " "Uptime" "${c_val}up ${UPTIME_STR}${c_reset}"
+print_row " " "Load average" "${c_val}${LOAD1}, ${LOAD5}, ${LOAD15}${c_reset} ${c_dim}[${CPU_CORES} cores]${c_reset}"
 echo ""
-printf "  ${c_label}%-15s${c_reset} RAM - %s used, %s available %9s / %s\n" "Memory:" "${RAM_USED_GB}G" "${RAM_FREE_GB}G" "" "${RAM_TOTAL_GB}G"
-printf "  %-15s %b\n" "" "$(draw_bar "$RAM_PERCENT")"
+print_row "$g_net" "Local IP" "${c_magenta}${IP_LOCAL}${c_reset}"
+print_row " " "Public IP" "${c_red}${IP_PUBLIC}${c_reset}"
 echo ""
-printf "  ${c_label}%-15s${c_reset} %s used, %s free %16s / %s\n" "Disk (/):" "${DISK_USED}" "${DISK_FREE}" "" "${DISK_SIZE}"
-printf "  %-15s %b\n" "" "$(draw_bar "$DISK_PERCENT")"
+printf "  ${c_head}%s${c_reset} ${c_label}%-14s${c_reset} %s used, %s free %8s / %s\n" "$g_sys" "Memory:" "${RAM_USED_GB}G" "${RAM_FREE_GB}G" "" "${RAM_TOTAL_GB}G"
+printf "  %-17s %b\n" "" "$(draw_bar "$RAM_PERCENT")"
 echo ""
-printf "  ${c_label}%-15s${c_reset} %b   %b   %b   %b\n" "Services:" "$SVC_FAIL2BAN" "$SVC_BT" "$SVC_NGINX" "$SVC_MYSQL"
-print_row "Updates" "${c_val}${UPDATES_STR}${c_reset}"
-[ -n "$REBOOT_REQ" ] && echo -e "  ${REBOOT_REQ}"
+printf "  ${c_head}%s${c_reset} ${c_label}%-14s${c_reset} %s used, %s free %14s / %s\n" "$g_sys" "Disk (/):" "${DISK_USED}" "${DISK_FREE}" "" "${DISK_SIZE}"
+printf "  %-17s %b\n" "" "$(draw_bar "$DISK_PERCENT")"
+echo ""
+printf "  ${c_head}%s${c_reset} ${c_label}%-14s${c_reset} %b  %b  %b  %b\n" "$g_sys" "Services:" "$SVC_FAIL2BAN" "$SVC_CP" "$SVC_NGINX" "$SVC_MYSQL"
+print_row " " "Updates" "${c_val}${UPDATES_STR}${c_reset}"
+[ -n "$REBOOT_REQ" ] && echo -e "    ${REBOOT_REQ}"
 echo ""
 
 # --- SECURITY SECTION ---
-draw_section "Security"
+draw_section "Security Core" "$g_sec"
 printf "    ${c_label}%-13s${c_reset} %b\n" "fail2ban:" "${F2B_STATS}"
-printf "    ${c_label}%-13s${c_reset} %b\n" "aaPanel:" "${c_val}running (master node)${c_reset}"
+
+if [ -n "$CP_NAME" ]; then
+    if systemctl is-active --quiet "$CP_SVC" 2>/dev/null || ( [ -x "/etc/init.d/$CP_SVC" ] && "/etc/init.d/$CP_SVC" status 2>/dev/null | grep -q "running" ); then
+        cp_status="${c_val}running (active node)${c_reset}"
+    else
+        cp_status="${c_dim}inactive/stopped${c_reset}"
+    fi
+    printf "    ${c_label}%-13s${c_reset} %b\n" "${CP_NAME}:" "${cp_status}"
+else
+    printf "    ${c_label}%-13s${c_reset} %b\n" "Control Panel:" "${c_dim}standalone server (no panel detected)${c_reset}"
+fi
 echo ""
 
 # --- BANNED IPS SECTION (SANITIZED) ---
-draw_section "Banned IPs (recent)"
+draw_section "Recent Threat Bans" "$g_sec"
 if [ -r /var/log/fail2ban.log ]; then
-    # Bounded read to prevent memory/CPU spikes. Sanitized output.
     tail -n 1000 /var/log/fail2ban.log | grep "Ban " | tail -n 4 | while read -r date time _ jail ip _; do
         s_ip=$(sanitize_ip "$ip")
         s_jail=$(sanitize_str "$jail")
-        printf "    ${c_red}%-16s${c_reset} ${c_label}%-12s${c_reset} ${c_dim}%s %s${c_reset}\n" "$s_ip" "$s_jail" "$date" "${time%,*}"
+        printf "    ${c_dim}${g_arr}${c_reset} ${c_red}%-16s${c_reset} ${c_label}%-12s${c_reset} ${c_dim}%s %s${c_reset}\n" "$s_ip" "$s_jail" "$date" "${time%,*}"
     done
 else
     echo -e "    ${c_dim}Log unreadable. Execute as root or add user to adm group.${c_reset}"
@@ -240,7 +283,7 @@ fi
 echo ""
 
 # --- RECENT LOGINS SECTION (SANITIZED) ---
-draw_section "Recent Logins"
+draw_section "Auth Audit Log" "$g_usr"
 last -a 2>/dev/null | head -n 4 | while read -r line; do
     if [[ -n "$line" && ! "$line" == wtmp* ]]; then
         user=$(echo "$line" | awk '{print $1}')
@@ -256,9 +299,9 @@ last -a 2>/dev/null | head -n 4 | while read -r line; do
         status_color=$c_label
         [[ "$s_time" == *"still logged in"* ]] && status_color=$c_green
         
-        printf "    ${c_val}%-15s${c_reset} ${c_dim}%-8s${c_reset} ${c_magenta}%-16s${c_reset} ${status_color}%s${c_reset}\n" "$s_user" "$s_tty" "$s_ip" "$s_time"
+        printf "    ${c_dim}${g_arr}${c_reset} ${c_val}%-15s${c_reset} ${c_dim}%-8s${c_reset} ${c_magenta}%-16s${c_reset} ${status_color}%s${c_reset}\n" "$s_user" "$s_tty" "$s_ip" "$s_time"
     fi
 done
 echo ""
-echo -e "  ${c_dim}Managed by VISIONGAIATECHNOLOGY. All activity is strictly monitored.${c_reset}"
+echo -e "  ${c_dim}Powered by VISIONGAIATECHNOLOGY OMEGA PROTOCOL. All inputs tracked.${c_reset}"
 echo ""
