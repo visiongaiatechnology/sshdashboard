@@ -12,6 +12,14 @@
 
 ---
 
+> ## ⚠️ EXPERIMENTAL NOTICE
+>
+> This script is published as **experimental R&D tooling**. It has been tested on Ubuntu/Debian with aaPanel, Plesk and cPanel environments, but behavior on other setups may vary.
+>
+> **Use at your own risk.** Replacing system MOTD components can affect login behavior. Always test on a non-production system first.
+
+---
+
 ## 🔍 What is VGT SSH Dashboard?
 
 A zero-dependency Bash MOTD replacement that renders a full **system intelligence HUD directly in your terminal on every SSH login** — no external tools, no Node.js, no Python. Pure Bash + ANSI.
