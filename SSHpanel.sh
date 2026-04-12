@@ -133,7 +133,8 @@ REBOOT_REQ=""
 check_service() {
     local svc="$1"
     local name="$2"
-    if systemctl is-active --quiet "$svc" 2>/dev/null || ( [ -x "/etc/init.d/$svc" ] && "/etc/init.d/$svc" status 2>/dev/null | grep -q "running" ); then
+    # VGT FIX: Ersetze grep -q durch grep >/dev/null um SIGPIPE (141) mit pipefail zu verhindern
+    if systemctl is-active --quiet "$svc" 2>/dev/null || ( [ -x "/etc/init.d/$svc" ] && "/etc/init.d/$svc" status 2>/dev/null | grep "running" >/dev/null ); then
         echo -e "${c_dim}[${c_green}●${c_dim}]${c_reset} ${c_val}${name}${c_reset}"
     else
         echo -e "${c_dim}[${c_red}●${c_dim}]${c_reset} ${c_dim}${name}${c_reset}"
@@ -284,7 +285,8 @@ echo ""
 
 # --- RECENT LOGINS SECTION (SANITIZED) ---
 draw_section "Auth Audit Log" "$g_usr"
-last -a 2>/dev/null | head -n 4 | while read -r line; do
+# VGT FIX: Nutze nativen -n 4 Parameter von last, um Pipe-Closure und SIGPIPE (141) Crash zu verhindern
+last -a -n 4 2>/dev/null | while read -r line; do
     if [[ -n "$line" && ! "$line" == wtmp* ]]; then
         user=$(echo "$line" | awk '{print $1}')
         tty=$(echo "$line" | awk '{print $2}')
