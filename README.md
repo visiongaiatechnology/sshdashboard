@@ -20,7 +20,7 @@
 
 ---
 ## Notice
-While the code for VGT SSH Dashboard is an independent development and original work by VisionGaia Technology, we acknowledge that the visual layout and section structure were inspired by the motd project by [EXT IT GmbH](github.com/EXT-IT/motd). We appreciate their contribution to the community's design standards for terminal dashboards. 
+While the code for VGT SSH Dashboard is an independent development and original work by VisionGaia Technology, we acknowledge that the visual layout and section structure were inspired by the motd project by [EXT IT GmbH](https://github.com/EXT-IT/motd). We appreciate their contribution to the community's design standards for terminal dashboards. 
 
 
 
