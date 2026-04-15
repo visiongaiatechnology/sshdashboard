@@ -1,10 +1,10 @@
 # 🖥️ VGT SSH Dashboard — Terminal Intelligence HUD
 
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-2.0_APEX-brightgreen?style=for-the-badge)](#)
-[![Target](https://img.shields.io/badge/Target-Ubuntu_%2F_Debian-E95420?style=for-the-badge&logo=ubuntu)](#)
-[![Shell](https://img.shields.io/badge/Shell-Bash-black?style=for-the-badge&logo=gnubash)](#)
-[![Panels](https://img.shields.io/badge/Panels-aaPanel_%7C_Plesk_%7C_cPanel-blue?style=for-the-badge)](#)
+[![Version](https://img.shields.io/badge/Version-3.0_APEX-brightgreen?style=for-the-badge)](#)
+[![Target](https://img.shields.io/badge/Target-Linux-FCC624?style=for-the-badge&logo=linux)](#)
+[![Language](https://img.shields.io/badge/Language-Go-00ADD8?style=for-the-badge&logo=go)](#)
+[![Architecture](https://img.shields.io/badge/Architecture-Concurrent_Goroutines-00ADD8?style=for-the-badge)](#)
 [![VGT](https://img.shields.io/badge/VGT-VisionGaia_Technology-red?style=for-the-badge)](https://visiongaiatechnology.de)
 
 > *"Know your server. The moment you log in."*
@@ -12,25 +12,34 @@
 
 ---
 
-> ## ⚠️ EXPERIMENTAL NOTICE
->
-> This script is published as **experimental R&D tooling**. It has been tested on Ubuntu/Debian with aaPanel, Plesk and cPanel environments, but behavior on other setups may vary.
->
-> **Use at your own risk.** Replacing system MOTD components can affect login behavior. Always test on a non-production system first.
+## ⚠️ DISCLAIMER: EXPERIMENTAL R&D PROJECT
+
+This project is a **Proof of Concept (PoC)** and part of ongoing research and development at
+VisionGaia Technology. It is **not** a certified or production-ready product.
+
+**Use at your own risk.** The software may contain security vulnerabilities, bugs, or
+unexpected behavior. It may break your environment if misconfigured or used improperly.
+
+**Do not deploy in critical production environments** unless you have thoroughly audited
+the code and understand the implications. For enterprise-grade, verified protection,
+we recommend established and officially certified solutions.
+
+Found a vulnerability or have an improvement? **Open an issue or contact us.**
 
 ---
 
 ## 🔍 What is VGT SSH Dashboard?
 
-A zero-dependency Bash MOTD replacement that renders a full **system intelligence HUD directly in your terminal on every SSH login** — no external tools, no Node.js, no Python. Pure Bash + ANSI.
+A **compiled Go binary** that renders a full **Tactical Intelligence HUD directly in your terminal on every SSH login** — concurrent data extraction, kernel-level syscalls, zero external dependencies beyond the Go standard library.
 
 ```
-Without VGT SSH Dashboard:          With VGT SSH Dashboard:
-→ Blank terminal or Ubuntu MOTD     → Full system HUD on login
-→ No security context               → Active sessions, IPs, privileges
-→ No resource overview              → RAM/Disk bars, Load, Uptime
-→ No threat visibility              → fail2ban bans, recent logins
-→ Slow update-motd.d scripts        → Zero-latency kernel extraction
+Old Bash MOTD:                      VGT SSH Dashboard Go Edition:
+→ Sequential execution              → Concurrent goroutines (3 parallel engines)
+→ Subshell overhead                 → Direct syscalls (Sysinfo, Statfs, Uname)
+→ External tool dependency          → Pure Go — no bash, awk, grep required
+→ No input sanitization             → CWE-150 hardened output sanitization
+→ PATH hijacking risk               → Absolute binary paths (CWE-426)
+→ No timeout enforcement            → 850ms global context deadline
 ```
 
 ---
@@ -38,163 +47,156 @@ Without VGT SSH Dashboard:          With VGT SSH Dashboard:
 ## 💎 What it shows
 
 ```
-  ╭────────────────────────────────────────────────────────╮
-  │  YOURNAME  • APEX ENGINE HUD                           │
-  ╰────────────────────────────────────────────────────────╯
+▊  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+▊    VISIONGAIA TECHNOLOGY  //  OMEGA PROTOCOL
+▊    NODE: HOSTNAME  AUTH: ROOT  SYS: Ubuntu 22.04 LTS
+▊  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 
-  👤 Logged as:      user@hostname  [sudo]
-     Sessions:       2 active (root(1), deploy(1))
+▊  TACTICAL INTEL  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+▊   IDS Status : 247 attackers blocked (fail2ban)
+▊     ▶ DROP  185.220.101.47 via sshd [03:12]
+▊     ▶ DROP  94.102.49.193  via sshd [07:44]
+▊   Last Auth :
+▊     ▶ GRANT root from 1.2.3.4  -> still logged in
+▊     ▶ GRANT deploy from 10.0.0.5 -> Wed Apr 9
 
-  ⚙ OS:             Ubuntu 22.04.3 LTS (kvm)
-    Kernel:          5.15.0-91-generic
-    Uptime:          up 12 days, 4 hours, 22 minutes
-    Load average:    0.12, 0.08, 0.05 [4 cores]
+▊  SYSTEM MATRIX  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+▊   CPU Load   : 0.12, 0.08, 0.05 [4 Cores]  Up: 12d 4h 22m
+▊   RAM Target : [████████████············] 3.2G / 8.0G
+▊   Disk Mount : [████████················] 42.0G / 220.0G
 
-  ⟁ Local IP:       192.168.1.10
-    Public IP:       1.2.3.4
-
-  ⚙ Memory:         1.2G used, 6.1G free          / 8.0G
-                    ████████████·························
-
-    Disk (/):       42G used, 180G free            / 220G
-                    ████████·····························
-
-  ⚙ Services:       [●] fail2ban  [●] aaPanel  [●] Nginx  [●] MySQL
-    Updates:        3 package(s) available (1 security)
-
-  ── 🛡 Security Core ──────────────────────────────────────
-    fail2ban:       247 IP(s) banned (extracted from logs)
-    aaPanel:        running (active node)
-
-  ── 🛡 Recent Threat Bans ─────────────────────────────────
-    › 185.220.101.47   sshd         2026-04-09 03:12
-    › 94.102.49.193    sshd         2026-04-09 07:44
-
-  ── 👤 Auth Audit Log ─────────────────────────────────────
-    › root            pts/0    1.2.3.4    still logged in
-    › deploy          pts/1    10.0.0.5   Wed Apr  9 08:01
+▊  EDGE NETWORK  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+▊   Routing IPs: L: 192.168.1.10  P: 1.2.3.4
+▊   Daemons    : [●] fail2ban  [●] nginx  [●] mysql
+▊  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ```
 
 ---
 
-## 🆕 V2 APEX — What's new
+## ⚙️ Architecture
 
-| Feature | Detail |
+```
+main()
+  │
+  ├── getSystemState()   goroutine → syscall.Sysinfo, /proc/meminfo, syscall.Statfs
+  ├── getNetworkState()  goroutine → UDP dial (Local IP), DNS TXT whoami.cloudflare (Public IP)
+  └── getSecurityState() goroutine → parseFail2BanLog(), exec /usr/bin/last
+
+All three run concurrently with an 850ms global context deadline.
+Timeout = graceful render with available data, no hang.
+```
+
+| Component | Method |
 |---|---|
-| **Multi-Panel Detection** | Auto-detects aaPanel, Plesk and cPanel — no manual config required |
-| **Hardened Input Sanitization** | CWE-150 Terminal Escape Injection prevention on all outputs |
-| **set -euo pipefail** | Strict error handling — script aborts on unhandled failures |
-| **readonly variables** | All constants locked at runtime |
-| **Bounded I/O** | fail2ban log read limited to last 10,000 lines — no I/O stall on large logs |
-| **POSIX df -P** | Prevents line-break issues on large disk labels |
-| **Native /proc reads** | Load and uptime read directly from kernel — no subshell overhead |
-| **VGT HUD Style Bars** | `█` fill + `·` empty for better visual contrast |
-| **Standalone Server Support** | Graceful fallback if no control panel is detected |
+| **Uptime / Load** | `syscall.Sysinfo` — direct kernel struct |
+| **Kernel / OS** | `syscall.Uname` + `/etc/os-release` |
+| **Memory** | `/proc/meminfo` — line-by-line scanner |
+| **Disk** | `syscall.Statfs("/")` |
+| **Local IP** | UDP dial to `1.1.1.1:80` — reads local addr |
+| **Public IP** | DNS TXT lookup `whoami.cloudflare` — no HTTP call |
+| **fail2ban** | Last 64KB of `/var/log/fail2ban.log` — bounded read |
+| **Services** | `/bin/systemctl is-active --quiet <name>` |
+| **Logins** | `/usr/bin/last -a -w -n 10` |
 
 ---
 
-## 📡 Data Sources
+## 🔒 Security Design
 
-| Section | Source | Method |
-|---|---|---|
-| **CPU / Load** | `/proc/loadavg` | Direct kernel read — zero subshell |
-| **Uptime** | `/proc/uptime` | Direct kernel read — zero subshell |
-| **Memory** | `free -m` | Single invocation |
-| **Disk** | `df -hP /` | POSIX mode — no line-break issues |
-| **Local IP** | `ip route get 1.1.1.1` | Default route extraction — ignores Docker/virtual bridges |
-| **Public IP** | `ifconfig.me` | 500ms hard timeout — shows `Offline` if unreachable |
-| **Updates** | `/var/lib/update-notifier/updates-available` | Cache read — no apt invocation |
-| **fail2ban** | `/var/log/fail2ban.log` | Last 10,000 lines — bounded I/O |
-| **Services** | `systemctl is-active` | No daemon restart triggered |
-| **Logins** | `last -a` | Standard auth log |
-| **Control Panel** | Directory + systemctl check | Auto-detection: aaPanel, Plesk, cPanel |
-
----
-
-## 🖥️ Panel Auto-Detection
-
-VGT SSH Dashboard V2 automatically detects your control panel — no configuration needed:
-
-| Panel | Detection method |
+| Hardening | Detail |
 |---|---|
-| **aaPanel** | `/www/server/panel` directory or `bt` service |
-| **Plesk** | `/usr/local/psa` directory or `psa` / `sw-cp-server` service |
-| **cPanel** | `/usr/local/cpanel` directory or `cpanel` service |
-| **None** | Displays `standalone server (no panel detected)` |
+| **CWE-150 — Terminal Injection** | `sanitizeStr()` and `sanitizeIP()` applied to all external data before output |
+| **CWE-426 — PATH Hijacking** | Absolute paths hardcoded: `/bin/systemctl`, `/usr/bin/last` |
+| **Context Deadline** | 850ms global timeout — no infinite hang possible |
+| **Bounded I/O** | fail2ban log: last 64KB only — no full-file read on large logs |
+| **No `clear`** | Scrollback buffer preserved — admin history never wiped |
+| **Regex pre-compiled** | `rxFail2Ban` and `rxLast` compiled once at startup — O(1) per line |
 
 ---
 
 ## 🚀 Installation
 
-### Step 1 — Download
+### Requirements
+
+```bash
+# Install Go
+apt install golang-go
+```
+
+### Step 1 — Remove old Bash version (if installed)
+
+```bash
+sudo rm /etc/update-motd.d/99-vgt-dashboard
+```
+
+### Step 2 — Clone and build
 
 ```bash
 git clone https://github.com/visiongaiatechnology/sshdashboard
 cd sshdashboard
+
+# Build optimized binary (stripped symbols, minimal size)
+go build -ldflags="-s -w" -o vgt-hud sshdashboard.go
 ```
 
-### Step 2 — Install as MOTD
+### Step 3 — Install binary
 
 ```bash
-sudo mv SSHpanel.sh /etc/update-motd.d/99-vgt-dashboard
-sudo chown root:root /etc/update-motd.d/99-vgt-dashboard
+sudo mv vgt-hud /usr/local/bin/vgt-hud
+sudo chown root:root /usr/local/bin/vgt-hud
+sudo chmod 755 /usr/local/bin/vgt-hud
+```
+
+### Step 4 — Register as MOTD
+
+```bash
+# Create MOTD wrapper
+echo '#!/bin/bash' | sudo tee /etc/update-motd.d/99-vgt-dashboard
+echo '/usr/local/bin/vgt-hud' | sudo tee -a /etc/update-motd.d/99-vgt-dashboard
 sudo chmod +x /etc/update-motd.d/99-vgt-dashboard
-```
 
-### Step 3 — Disable default Ubuntu MOTD
-
-```bash
+# Disable default Ubuntu MOTD scripts
 sudo chmod -x /etc/update-motd.d/*
 sudo chmod +x /etc/update-motd.d/99-vgt-dashboard
 ```
 
-> This disables the default Ubuntu news/ads/landscape scripts. Your dashboard is now the only thing that runs on login.
-
-### Step 4 — Verify
+### Step 5 — Verify
 
 ```bash
 sudo run-parts /etc/update-motd.d/
 ```
 
-Or open a new SSH session — the dashboard appears immediately.
-
----
-
-## ⚙️ Alternative: profile.d Installation
-
-```bash
-sudo nano /etc/profile.d/vgt_motd.sh
-# Paste the script content, save
-
-sudo chmod +x /etc/profile.d/vgt_motd.sh
-```
-
-> `profile.d` triggers on interactive login shells only. `update-motd.d` is more reliable across SSH client configurations.
+Or open a new SSH session — the HUD appears immediately.
 
 ---
 
 ## 🔧 Customization
 
-### Branding
+Open `sshdashboard.go` and edit the branding section:
 
-```bash
-# Header — replace with your own name/label:
-echo -e "  YOURNAME • YOUR ENGINE HUD"
+```go
+// Header — replace with your own name/label:
+printRail(fmt.Sprintf("  YOURNAME  //  YOUR ENGINE"))
 
-# Footer — replace the credit line:
-echo -e "  Powered by YOURNAME. All inputs tracked."
+// Footer — replace the credit line:
+// Find the footer printRail and update accordingly
 ```
 
-### Colors
+**Colors** — all ANSI 256 constants at the top of the file:
 
-All colors are defined as `readonly` ANSI 256 variables at the top of the script:
+```go
+cRail  = "\033[38;5;39m"   // Cyan rail — left border glyph
+cBrand = "\033[38;5;81m"   // Brand color — header
+cOk    = "\033[38;5;113m"  // Green — active services
+cWarn  = "\033[38;5;220m"  // Yellow — warnings
+cCrit  = "\033[38;5;196m"  // Red — critical / bans
+cMag   = "\033[38;5;170m"  // Magenta — IPs / highlights
+```
+
+After any change, rebuild:
 
 ```bash
-c_head="\033[38;5;39m"      # Cyan/Blue — section headers & glyphs
-c_green="\033[38;5;113m"    # Status OK — active services
-c_red="\033[38;5;196m"      # Critical — Public IP, bans
-c_yellow="\033[38;5;220m"   # Warnings — updates, reboot
-c_magenta="\033[38;5;170m"  # Highlights — IPs
+go build -ldflags="-s -w" -o vgt-hud sshdashboard.go
+sudo mv vgt-hud /usr/local/bin/vgt-hud
 ```
 
 ---
@@ -203,32 +205,11 @@ c_magenta="\033[38;5;170m"  # Highlights — IPs
 
 | Requirement | Detail |
 |---|---|
-| **OS** | Ubuntu 22.04+ / Debian 11+ |
-| **Shell** | Bash 5.0+ |
+| **OS** | Linux (Ubuntu 22.04+ / Debian 11+ recommended) |
+| **Go** | 1.21+ (`apt install golang-go`) |
+| **Build tag** | `//go:build linux` — Linux only |
 | **Root access** | Required for fail2ban log read and MOTD installation |
-| **Network** | Optional — `ifconfig.me` has 500ms hard timeout |
-
----
-
-## 🔒 Security Notes
-
-**Terminal Injection Prevention (CWE-150):**
-All external data (IPs, usernames, hostnames) is sanitized through `sanitize_ip()` and `sanitize_str()` before output. Escape sequences in log data cannot affect your terminal.
-
-**fail2ban log access:**
-```bash
-# Add your user to the adm group for log access without sudo
-sudo usermod -aG adm YOUR_USER
-```
-
-**Public IP lookup:**
-The script calls `ifconfig.me` with a 500ms hard timeout on every login. To disable:
-```bash
-# Replace this line in the script:
-IP_PUBLIC_RAW=$(curl -s --connect-timeout 0.5 --max-time 0.5 https://ifconfig.me/ip 2>/dev/null || echo "Offline")
-# With:
-IP_PUBLIC_RAW="disabled"
-```
+| **Network** | Optional — DNS lookup has 850ms hard deadline |
 
 ---
 
@@ -259,7 +240,7 @@ IP_PUBLIC_RAW="disabled"
 
 ## 🤝 Contributing
 
-Pull requests are welcome. Tested configurations and compatibility reports for other distros and panels are especially appreciated.
+Pull requests are welcome. Tested configurations and compatibility reports for other distros are especially appreciated.
 
 Licensed under **MIT** — use freely, modify freely.
 
@@ -275,4 +256,4 @@ VisionGaia Technology builds enterprise-grade security infrastructure — engine
 
 ---
 
-*VGT SSH Dashboard V2 APEX — Terminal Intelligence HUD // SSHpanel.sh // Bash // MIT License*
+*VGT SSH Dashboard V3 APEX — Terminal Intelligence HUD // sshdashboard.go // Go // MIT License*
