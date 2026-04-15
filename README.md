@@ -28,6 +28,9 @@ Found a vulnerability or have an improvement? **Open an issue or contact us.**
 
 ---
 
+<img width="672" height="418" alt="{2E0B2ABD-68DB-4C97-AF87-4BA8091F608A}" src="https://github.com/user-attachments/assets/79aacf95-57d8-4e38-81ec-14db647471ad" />
+
+
 ## 🔍 What is VGT SSH Dashboard?
 
 A **compiled Go binary** that renders a full **Tactical Intelligence HUD directly in your terminal on every SSH login** — concurrent data extraction, kernel-level syscalls, zero external dependencies beyond the Go standard library.
