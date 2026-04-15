@@ -346,9 +346,10 @@ func parseFail2BanLog(filePath string, state *SecurityState) {
 func getSecurityState(ctx context.Context, wg *sync.WaitGroup, state *SecurityState) {
 	defer wg.Done()
 
-	state.SvcFail2Ban = checkService(ctx, "fail2ban")
-	state.SvcNginx = checkService(ctx, "nginx")
-	state.SvcMySQL = checkService(ctx, "mysqld") || checkService(ctx, "mysql")
+	// VGT Multi-Layer Verification: Systemd + Kernel Process Table (KPT)
+	state.SvcFail2Ban = checkService(ctx, "fail2ban") || isProcessRunning("fail2ban-server")
+	state.SvcNginx = checkService(ctx, "nginx") || isProcessRunning("nginx")
+	state.SvcMySQL = checkService(ctx, "mysqld") || checkService(ctx, "mysql") || isProcessRunning("mysqld")
 
 	state.LogReadable = false
 	parseFail2BanLog("/var/log/fail2ban.log", state)
@@ -387,6 +388,49 @@ func getSecurityState(ctx context.Context, wg *sync.WaitGroup, state *SecuritySt
 func checkService(ctx context.Context, name string) bool {
 	err := exec.CommandContext(ctx, cmdSystemctl, "is-active", "--quiet", name).Run()
 	return err == nil
+}
+
+// VGT KERNEL DIREKTIVE: Deep Process Table Scanning (KPT-Scan)
+// Umgeht Systemd-Illusionen (Docker, Custom Binaries). Zero-Allocation Check.
+func isProcessRunning(target string) bool {
+	d, err := os.Open("/proc")
+	if err != nil {
+		return false
+	}
+	defer d.Close()
+
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return false
+	}
+
+	buf := make([]byte, 64)
+	for _, pid := range names {
+		// Überspringe Nicht-PID-Ordner
+		if pid[0] < '0' || pid[0] > '9' {
+			continue
+		}
+		f, err := os.Open("/proc/" + pid + "/comm")
+		if err != nil {
+			continue
+		}
+		n, _ := f.Read(buf)
+		f.Close()
+
+		if n > 0 {
+			// Der Go-Compiler optimiert string(byte_slice) == string zu 0 Heap Allokationen
+			if buf[n-1] == '\n' {
+				if string(buf[:n-1]) == target {
+					return true
+				}
+			} else {
+				if string(buf[:n]) == target {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // --- 5. TACTICAL RENDER ENGINE ---
