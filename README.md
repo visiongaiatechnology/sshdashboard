@@ -27,8 +27,15 @@ we recommend established and officially certified solutions.
 Found a vulnerability or have an improvement? **Open an issue or contact us.**
 
 ---
-
+## SSHDashboard.go
 <img width="672" height="418" alt="{2E0B2ABD-68DB-4C97-AF87-4BA8091F608A}" src="https://github.com/user-attachments/assets/79aacf95-57d8-4e38-81ec-14db647471ad" />
+
+
+## SSHDashboard2.go 
+<img width="655" height="382" alt="{3F38A5A4-D39B-4C27-8A05-FDBC778237D5}" src="https://github.com/user-attachments/assets/78bcc3d2-3d68-490d-80cb-4dee5c5c2175" />
+
+
+
 
 
 ## 🔍 What is VGT SSH Dashboard?
