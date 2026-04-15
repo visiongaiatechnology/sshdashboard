@@ -20,24 +20,26 @@ import (
 	"unsafe"
 )
 
-// --- 1. VGT SUPREME UI TOKENS (ANSI 256 / TRUECOLOR METRICS) ---
+// --- 1. NEON TACTICAL PALETTE & UI TOKENS ---
 const (
-	cReset   = "\033[0m"
-	cBold    = "\033[1m"
-	cDim     = "\033[38;5;240m"
-	cText    = "\033[38;5;250m"
-	cPrimary = "\033[38;5;39m"  // VGT Azure
-	cSec     = "\033[38;5;87m"  // VGT Cyan
-	cAlert   = "\033[38;5;196m" // Critical Red
-	cWarn    = "\033[38;5;214m" // Warning Orange
-	cSafe    = "\033[38;5;112m" // System Green
-	cDarkBg  = "\033[38;5;234m" // Deep Slate
+	cReset  = "\033[0m"
+	cBold   = "\033[1m"
+	cDim    = "\033[2m"
+	cInv    = "\033[7m"
 
-	gSys = "◈"
-	gNet = "⟁"
-	gSec = "✇"
-	gUsr = "⎈"
-	gArr = "⟩"
+	cRail   = "\033[38;5;39m"
+	cBrand  = "\033[38;5;81m"
+	cLabel  = "\033[38;5;244m"
+	cVal    = "\033[38;5;255m"
+
+	cOk     = "\033[38;5;113m"
+	cWarn   = "\033[38;5;220m"
+	cCrit   = "\033[38;5;196m"
+	cMag    = "\033[38;5;170m"
+	cBarBg  = "\033[38;5;235m"
+
+	gRail   = "▊"
+	gArr    = "▶"
 )
 
 // --- 2. ARCHITECTURE & STATE MEMORY ---
@@ -102,7 +104,6 @@ const (
 
 // --- 3. HARDENED KERNEL & MEMORY SANITIZATION ---
 
-// b2s: Safe zero-allocation string casting with guaranteed bounds checking to prevent OOB Panic.
 func b2s(b []int8) string {
 	if len(b) == 0 {
 		return ""
@@ -140,7 +141,6 @@ func sanitizeStr(s string) string {
 	return b.String()
 }
 
-// fastParseUint: Zero-allocation, reflection-free integer parsing for /proc/meminfo
 func fastParseUint(s string) uint64 {
 	var n uint64
 	for i := 0; i < len(s); i++ {
@@ -174,9 +174,9 @@ func getSystemState(ctx context.Context, wg *sync.WaitGroup, state *SystemState)
 	if u, err := user.Current(); err == nil {
 		state.UserName = sanitizeStr(u.Username)
 		if u.Uid == "0" {
-			state.Privilege = cAlert + "ROOT" + cReset
+			state.Privilege = cCrit + "ROOT" + cReset
 		} else {
-			state.Privilege = cSec + "USER" + cReset
+			state.Privilege = cOk + "USER" + cReset
 		}
 	}
 
@@ -319,13 +319,11 @@ func parseFail2BanLog(filePath string, state *SecurityState) {
 	}
 
 	scanner := bufio.NewScanner(r)
-	// VGT Security: Prevent Scanner DoS Attack (Max 4KB per line, dropping larger lines)
 	scanner.Buffer(make([]byte, 4096), 4096)
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		
-		// VGT HÄRTUNG: ReDoS Prevention durch striktes Line-Length Capping
 		if len(line) > 512 || len(line) < 40 {
 			continue
 		}
@@ -360,7 +358,6 @@ func getSecurityState(ctx context.Context, wg *sync.WaitGroup, state *SecuritySt
 		}
 	}
 
-	// CWE-426 Fix: Nutzung absoluter Pfade für Binary-Execution
 	out, err := exec.CommandContext(ctx, cmdLast, "-a", "-w", "-n", "10").Output()
 	if err == nil {
 		scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -388,72 +385,56 @@ func getSecurityState(ctx context.Context, wg *sync.WaitGroup, state *SecuritySt
 }
 
 func checkService(ctx context.Context, name string) bool {
-	// CWE-426 Fix: Nutzung absoluter Pfade für Binary-Execution
 	err := exec.CommandContext(ctx, cmdSystemctl, "is-active", "--quiet", name).Run()
 	return err == nil
 }
 
-// --- 5. RENDER ENGINE (VGT DIAMOND TIER UI) ---
+// --- 5. TACTICAL RENDER ENGINE ---
 
-func drawBar(percent int, maxWidth int) string {
+func printRail(text string) {
+	fmt.Printf("%s%s%s %s\n", cRail, gRail, cReset, text)
+}
+
+func drawBar(percent int) string {
 	if percent < 0 {
 		percent = 0
 	} else if percent > 100 {
 		percent = 100
 	}
 
-	barLen := maxWidth - 26
-	if barLen < 10 {
-		barLen = 10
-	} else if barLen > 50 {
-		barLen = 50
-	}
-
+	barLen := 24 // Fixed length for Tactical UI
 	filled := (percent * barLen) / 100
 	empty := barLen - filled
 
-	color := cSafe
-	if percent > 75 {
+	color := cOk
+	if percent > 70 {
 		color = cWarn
 	}
-	if percent > 90 {
-		color = cAlert
+	if percent > 85 {
+		color = cCrit
 	}
 
-	// Sub-pixel aesthetic rendering
 	bFilled := strings.Repeat("█", filled)
-	bEmpty := strings.Repeat("░", empty)
+	bEmpty := strings.Repeat("·", empty)
 
-	return fmt.Sprintf("%s%s%s%s%s", color, bFilled, cDarkBg, bEmpty, cReset)
-}
-
-func printRow(glyph, label, val string) {
-	fmt.Printf("  %s%s%s %s%-14s%s %s\n", cPrimary, glyph, cReset, cText, label+":", cReset, val)
-}
-
-func drawSection(title, glyph string, termWidth int) {
-	lineLen := termWidth - len(title) - 10
-	if lineLen > 50 {
-		lineLen = 50
-	} else if lineLen < 5 {
-		lineLen = 5
-	}
-	lineStr := strings.Repeat("─", lineLen)
-	fmt.Printf("  %s├─ %s%s %s %s%s%s\n", cDim, cPrimary, glyph, title, cDim, lineStr, cReset)
+	return fmt.Sprintf("%s%s%s%s%s", color, bFilled, cBarBg, bEmpty, cReset)
 }
 
 func formatSvc(active bool, name string) string {
 	if active {
-		return fmt.Sprintf("%s[%s◉%s]%s %s%s%s", cDim, cSafe, cDim, cReset, cText, name, cReset)
+		return fmt.Sprintf("%s[%s●%s]%s %s%s%s", cDim, cOk, cDim, cReset, cVal, name, cReset)
 	}
-	return fmt.Sprintf("%s[%s◌%s]%s %s%s%s", cDim, cAlert, cDim, cReset, cDim, name, cReset)
+	return fmt.Sprintf("%s[%s◌%s]%s %s%s%s", cDim, cCrit, cDim, cReset, cDim, name, cReset)
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 850*time.Millisecond) // Aggressive UI Timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 850*time.Millisecond)
 	defer cancel()
 
 	termWidth := getTermWidth()
+	if termWidth > 100 {
+		termWidth = 100 // Cap UI aesthetic spread
+	}
 
 	var wg sync.WaitGroup
 	var sys SystemState
@@ -476,71 +457,81 @@ func main() {
 	case <-ctx.Done():
 	}
 
-	// TUI RENDER TREE
-	fmt.Print("\033[H\033[2J\n")
+	// -------------------------------------------------------------------------
+	// 6. FINAL UI RENDER (NEON TACTICAL LAYOUT)
+	// -------------------------------------------------------------------------
+	
+	// VGT FIX: Kein `clear`. Schützt den Admin-Scrollback. Nur visuelle Trennung.
+	fmt.Println()
+	fmt.Println()
 
-	headLen := 60
-	if termWidth < 64 {
-		headLen = termWidth - 4
+	bLineLen := termWidth - 4
+	if bLineLen < 40 {
+		bLineLen = 40
 	}
-	topBorder := strings.Repeat("━", headLen)
 
-	fmt.Printf("  %s┏%s┓%s\n", cPrimary, topBorder, cReset)
-	fmt.Printf("  %s┃%s  %s%sVISIONGAIATECHNOLOGY%s %s// APEX NODE HUD%s  %s┃%s\n", cPrimary, cReset, cSec, cBold, cReset, cDim, cReset, cPrimary, cReset)
-	fmt.Printf("  %s┗%s┛%s\n\n", cPrimary, topBorder, cReset)
+	// HEADER
+	printRail(fmt.Sprintf("%s %s", cBrand, strings.Repeat("▀", bLineLen)+cReset))
+	printRail(fmt.Sprintf("  %s%sVISIONGAIA TECHNOLOGY%s  %s//%s  %sOMEGA PROTOCOL%s", cBold, cVal, cReset, cDim, cReset, cBrand, cReset))
+	printRail(fmt.Sprintf("  %sNODE:%s %s%s%s  %sAUTH:%s %s  %sSYS:%s %s%s%s", 
+		cLabel, cReset, cVal, strings.ToUpper(sys.HostName), cReset, 
+		cLabel, cReset, sys.Privilege, 
+		cLabel, cReset, cVal, sys.OS, cReset))
+	printRail(fmt.Sprintf("%s %s", cBrand, strings.Repeat("▄", bLineLen)+cReset))
+	printRail("")
 
-	printRow(gUsr, "Identity", fmt.Sprintf("%s%s@%s%s  %s[%s%s]%s", cText, sys.UserName, sys.HostName, cReset, cDim, sys.Privilege, cDim, cReset))
-	fmt.Println()
-
-	printRow(gSys, "OS Core", fmt.Sprintf("%s%s%s", cText, sys.OS, cReset))
-	printRow(" ", "Kernel", fmt.Sprintf("%s%s%s", cDim, sys.Kernel, cReset))
-	printRow(" ", "Uptime", fmt.Sprintf("%s%s%s", cSec, sys.Uptime, cReset))
-	printRow(" ", "Telemetry", fmt.Sprintf("%s%s%s %s[Cores: %d]%s", cText, sys.Load, cReset, cDim, sys.Cores, cReset))
-	fmt.Println()
-
-	printRow(gNet, "Internal IP", fmt.Sprintf("%s%s%s", cSec, net.LocalIP, cReset))
-	printRow(" ", "External Node", fmt.Sprintf("%s%s%s", cPrimary, net.PublicIP, cReset))
-	fmt.Println()
-
-	fmt.Printf("  %s%s%s %s%-14s%s %.1fG alloc / %.1fG free  %s[%.1fG]%s\n", cPrimary, gSys, cReset, cText, "Memory:", cReset, sys.RAMUsedGB, (sys.RAMTotalGB - sys.RAMUsedGB), cDim, sys.RAMTotalGB, cReset)
-	fmt.Printf("  %-17s %s\n\n", "", drawBar(sys.RAMPercent, termWidth))
-
-	fmt.Printf("  %s%s%s %s%-14s%s %.1fG alloc / %.1fG free  %s[%.1fG]%s\n", cPrimary, gSys, cReset, cText, "Storage (/):", cReset, sys.DiskUsedGB, (sys.DiskTotalGB - sys.DiskUsedGB), cDim, sys.DiskTotalGB, cReset)
-	fmt.Printf("  %-17s %s\n\n", "", drawBar(sys.DiskPercent, termWidth))
-
-	printRow(gSys, "Daemons", fmt.Sprintf("%s  %s  %s", formatSvc(sec.SvcFail2Ban, "fail2ban"), formatSvc(sec.SvcNginx, "nginx"), formatSvc(sec.SvcMySQL, "mysql")))
-	fmt.Println()
-
-	// SEC-OPS SUB-DASHBOARD
-	drawSection("Perimeter Defense", gSec, termWidth)
+	// TACTICAL INTEL
+	sep := strings.Repeat("━", 50)
+	printRail(fmt.Sprintf("%s%sTACTICAL INTEL%s  %s%s%s", cBold, cVal, cReset, cDim, sep, cReset))
+	
 	if sec.LogReadable {
-		fmt.Printf("    %s%-13s%s %s%d MALICIOUS ACTORS BLOCKED%s\n\n", cText, "Status:", cReset, cWarn, sec.BannedCount, cReset)
+		printRail(fmt.Sprintf(" %sIDS Status :%s %s%d attackers blocked%s (fail2ban)", cLabel, cReset, cWarn, sec.BannedCount, cReset))
 	} else {
-		fmt.Printf("    %s%-13s%s %sNO AUDIT DATA (ROOT REQUIRED)%s\n\n", cText, "Status:", cReset, cDim, cReset)
+		printRail(fmt.Sprintf(" %sIDS Status :%s %sNO AUDIT DATA (ROOT REQUIRED)%s", cLabel, cReset, cDim, cReset))
 	}
 
 	if len(sec.RecentBans) > 0 {
 		for _, ban := range sec.RecentBans {
-			fmt.Printf("    %s%s%s %s%-15s%s %s%-12s%s %s%s %s%s\n", cDim, gArr, cReset, cAlert, ban.IP, cReset, cText, string(ban.Jail), cReset, cDim, ban.Date, ban.Time, cReset)
+			printRail(fmt.Sprintf("   %s%s DROP%s  %s%s%s %svia %s [%s]%s", cCrit, gArr, cReset, cVal, ban.IP, cReset, cDim, ban.Jail, ban.Time, cReset))
 		}
 	} else if sec.LogReadable {
-		fmt.Printf("    %s[+] Zero network anomalies detected.%s\n", cSafe, cReset)
+		printRail(fmt.Sprintf("   %s%s SECURE%s %sZero network anomalies detected.%s", cOk, gArr, cReset, cDim, cReset))
 	}
-	fmt.Println()
 
-	drawSection("Access Ledger", gUsr, termWidth)
+	printRail(fmt.Sprintf(" %sLast Auth  :%s", cLabel, cReset))
 	if len(sec.RecentLogins) > 0 {
 		for _, login := range sec.RecentLogins {
-			stCol := cText
+			c := cDim
 			if login.Active {
-				stCol = cSafe
+				c = cOk
 			}
-			fmt.Printf("    %s%s%s %s%-14s%s %s%-8s%s %s%-15s%s %s%s%s\n", cDim, gArr, cReset, cText, login.User, cReset, cDim, login.TTY, cReset, cSec, login.IP, cReset, stCol, login.Time, cReset)
+			printRail(fmt.Sprintf("   %s%s GRANT%s %s%s%s %sfrom%s %s%s%s %s->%s %s%s%s", 
+				cBrand, gArr, cReset, cVal, login.User, cReset, cDim, cReset, cVal, login.IP, cReset, cDim, cReset, c, login.Time, cReset))
 		}
 	} else {
-		fmt.Printf("    %s[-] Log buffer void.%s\n", cDim, cReset)
+		printRail(fmt.Sprintf("   %s[-] Log buffer void.%s", cDim, cReset))
 	}
+	printRail("")
 
+	// SYSTEM MATRIX
+	printRail(fmt.Sprintf("%s%sSYSTEM MATRIX%s   %s%s%s", cBold, cVal, cReset, cDim, sep, cReset))
+	printRail(fmt.Sprintf(" %sCPU Load   :%s %s%s%s %s[%d Cores]%s  %sUp:%s %s%s%s", 
+		cLabel, cReset, cVal, sys.Load, cReset, cDim, sys.Cores, cReset, cLabel, cReset, cVal, sys.Uptime, cReset))
+	printRail(fmt.Sprintf(" %sRAM Target :%s [%s] %s%.1fG%s%s / %.1fG%s", 
+		cLabel, cReset, drawBar(sys.RAMPercent), cVal, sys.RAMUsedGB, cReset, cDim, sys.RAMTotalGB, cReset))
+	printRail(fmt.Sprintf(" %sDisk Mount :%s [%s] %s%.1fG%s%s / %.1fG%s", 
+		cLabel, cReset, drawBar(sys.DiskPercent), cVal, sys.DiskUsedGB, cReset, cDim, sys.DiskTotalGB, cReset))
+	printRail("")
+
+	// EDGE NETWORK
+	printRail(fmt.Sprintf("%s%sEDGE NETWORK%s    %s%s%s", cBold, cVal, cReset, cDim, sep, cReset))
+	printRail(fmt.Sprintf(" %sRouting IPs:%s %sL:%s %s%s%s  %sP:%s %s%s%s", 
+		cLabel, cReset, cDim, cReset, cVal, net.LocalIP, cReset, cDim, cReset, cVal, net.PublicIP, cReset))
+	printRail(fmt.Sprintf(" %sDaemons    :%s %s  %s  %s", 
+		cLabel, cReset, formatSvc(sec.SvcFail2Ban, "fail2ban"), formatSvc(sec.SvcNginx, "nginx"), formatSvc(sec.SvcMySQL, "mysql")))
+	printRail("")
+	
+	// FOOTER
+	printRail(fmt.Sprintf("%s▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀%s", cRail, cReset))
 	fmt.Println()
-	fmt.Printf("  %s━━ VGT OMEGA PROTOCOL ACTIVE // END OF REPORT ━━%s\n\n", cDim, cReset)
 }
