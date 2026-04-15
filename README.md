@@ -12,25 +12,13 @@
 
 ---
 
-## ⚠️ DISCLAIMER: EXPERIMENTAL R&D PROJECT
-
-This project is a **Proof of Concept (PoC)** and part of ongoing research and development at
-VisionGaia Technology. It is **not** a certified or production-ready product.
-
-**Use at your own risk.** The software may contain security vulnerabilities, bugs, or
-unexpected behavior. It may break your environment if misconfigured or used improperly.
-
-**Do not deploy in critical production environments** unless you have thoroughly audited
-the code and understand the implications. For enterprise-grade, verified protection,
-we recommend established and officially certified solutions.
-
-Found a vulnerability or have an improvement? **Open an issue or contact us.**
+> ## ⚠️ EXPERIMENTAL NOTICE
+>
+> This script is published as **experimental R&D tooling**. It has been tested on Ubuntu/Debian with aaPanel, Plesk and cPanel environments, but behavior on other setups may vary.
+>
+> **Use at your own risk.** Replacing system MOTD components can affect login behavior. Always test on a non-production system first.
 
 ---
-## Notice
-While the code for VGT SSH Dashboard is an independent development and original work by VisionGaia Technology, we acknowledge that the visual layout and section structure were inspired by the motd project by [EXT IT GmbH](https://github.com/EXT-IT/motd). We appreciate their contribution to the community's design standards for terminal dashboards. 
-
-
 
 ## 🔍 What is VGT SSH Dashboard?
 
