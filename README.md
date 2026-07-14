@@ -25,10 +25,15 @@ Found a vulnerability or have an improvement? **Open an issue or contact us.**
 ---
 
 ## SSHDash — Live TUI
-<img width="672" height="418" alt="{2E0B2ABD-68DB-4C97-AF87-4BA8091F608A}" src="https://github.com/user-attachments/assets/79aacf95-57d8-4e38-81ec-14db647471ad" />
 
-## SSHDash — MOTD Snapshot
-<img width="655" height="382" alt="{3F38A5A4-D39B-4C27-8A05-FDBC778237D5}" src="https://github.com/user-attachments/assets/78bcc3d2-3d68-490d-80cb-4dee5c5c2175" />
+<img width="2539" height="1351" alt="image" src="https://github.com/user-attachments/assets/78475f12-2c08-44d7-bfcd-90dac78f2ee7" />
+
+<img width="2539" height="1351" alt="image" src="https://github.com/user-attachments/assets/b602f21a-5f1a-46e7-b472-23799e25a949" />
+
+<img width="2539" height="1351" alt="image" src="https://github.com/user-attachments/assets/303eeca8-91fc-4eaf-bb63-55873a5323f3" />
+
+<img width="2539" height="1351" alt="image" src="https://github.com/user-attachments/assets/42f60b4e-981b-4b87-8583-786d71d95a91" />
+
 
 ---
 
